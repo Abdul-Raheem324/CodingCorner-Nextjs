@@ -50,7 +50,8 @@
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
     "tsconfig-paths": "^4.2.0",
-    "uuid": "^11.0.3"
+    "uuid": "^11.0.3",
+    "webpack": "^5.97.1"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
