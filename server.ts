@@ -6,7 +6,7 @@ type UserSocketMap = Record<string, string>;
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "localhost";
-const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 5000;
+const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 const app = next({ dev, hostname, port });
 const handler = app.getRequestHandler();
 
@@ -14,16 +14,13 @@ const userSocketMap: UserSocketMap = {};
 
 app.prepare().then(() => {
   const httpServer = createServer(handler);
-
   const io = new Server(httpServer);
 
   function getAllClients(id: string) {
-    return Array.from(io.sockets.adapter.rooms.get(id) || []).map(
-      (socketId) => ({
-        socketId,
-        username: userSocketMap[socketId],
-      })
-    );
+    return Array.from(io.sockets.adapter.rooms.get(id) || []).map((socketId) => ({
+      socketId,
+      username: userSocketMap[socketId],
+    }));
   }
 
   io.on("connection", (socket) => {
@@ -40,10 +37,6 @@ app.prepare().then(() => {
           socketId: socket.id,
         });
       });
-    });
-
-    socket.on("disconnect", () => {
-      console.log("Client disconnected");
     });
 
     socket.on("disconnecting", () => {

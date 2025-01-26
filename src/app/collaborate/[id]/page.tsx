@@ -32,64 +32,8 @@ const CollaborativePage: React.FC = () => {
 
    const lastEmittedCodeRef = useRef(code);
 
-  // useEffect(() => {
-  //   if (user && id) {
-  //     console.log("Sending join event");
-  //     const handleConnect = async () => {
-  //       console.log("Connected to server");
-  //       socket.emit("join", { id, user });
-
-  //       socket.on("joined", ({ clients, username, socketId }) => {
-  //         console.log("Clients in room:", clients);
-  //         if (username !== user?.username) {
-  //           toast.success(`${username} joined!`);
-  //         }
-  //         setClient(clients);
-
-  //         socket.emit("syncCode", {
-  //           code: code,
-  //           socketId,
-  //         });
-  //       });
-
-  //       socket.on("disconnected", ({ socketId, username }) => {
-  //         toast.error(`${username} left!`);
-  //         setClient((prev) =>
-  //           prev.filter((client) => client.socketId !== socketId)
-  //         );
-  //       });
-
-  //       socket.on("codeChange", (newCode) => {
-  //         console.log("Received code change:", newCode);
-  //         setCode(newCode);
-  //         if (editorRef.current) {
-  //           editorRef.current.setValue(newCode);
-  //         }
-  //       });
-
-  //       socket.on("changeLanguage", (newLanguage) => {
-  //         console.log("Received language change:", newLanguage);
-  //         setLanguage(newLanguage);
-  //       });
-  //     };
-
-  //     socket.on("connect", handleConnect);
-
-  //     return () => {
-  //       console.log("Cleaning up socket connection");
-  //       socket.off("connect", handleConnect);
-  //       socket.off("joined");
-  //       socket.off("disconnected");
-  //       socket.off("codeChange");
-  //       socket.off("changeLanguage");
-  //       socket.off("syncCode");
-  //       socket.disconnect();
-  //     };
-  //   }
-  // }, [user, id, socket]);
-
   useEffect(() => {
-    if (user && id) {
+    if (user && id && socket) {
       const handleConnect = async () => {
         console.log("Connected to server");
         socket.emit("join", { id, user });
@@ -101,21 +45,19 @@ const CollaborativePage: React.FC = () => {
           }
           setClient(clients);
 
-          // Only emit code if it's different from the last emitted code
+          // Sync code only if code is different
           if (lastEmittedCodeRef.current !== code) {
             socket.emit("syncCode", {
               code: code,
               socketId,
             });
-            lastEmittedCodeRef.current = code; // Update ref
+            lastEmittedCodeRef.current = code; // Update the last emitted code
           }
         });
 
         socket.on("disconnected", ({ socketId, username }) => {
           toast.error(`${username} left!`);
-          setClient((prev) =>
-            prev.filter((client) => client.socketId !== socketId)
-          );
+          setClient((prev) => prev.filter((client) => client.socketId !== socketId));
         });
 
         socket.on("codeChange", (newCode) => {
@@ -127,12 +69,11 @@ const CollaborativePage: React.FC = () => {
         });
 
         socket.on("changeLanguage", (newLanguage) => {
-          console.log("Received language change:", newLanguage);
           setLanguage(newLanguage);
         });
       };
 
-      socket.on("connect", handleConnect);
+      socket.on("connect", handleConnect); 
 
       return () => {
         console.log("Cleaning up socket connection");
@@ -145,7 +86,7 @@ const CollaborativePage: React.FC = () => {
         socket.disconnect();
       };
     }
-  }, [user, id, socket, code]); 
+  }, [user, id, socket]);
 
   useEffect(() => {
     const handleResize = () => {
