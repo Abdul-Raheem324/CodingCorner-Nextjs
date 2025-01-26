@@ -3,7 +3,7 @@ import { NextConfig } from 'next';
 import { Configuration } from 'webpack';
 
 const nextConfig: NextConfig = {
-  reactStrictMode: false,
+  reactStrictMode: true,
   webpack(config: Configuration) {
     if (config.resolve) {
       config.resolve.alias = {
