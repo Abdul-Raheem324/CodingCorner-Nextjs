@@ -22,6 +22,14 @@ export default function RootLayout({
       <html lang="en">
         <head>
           <title>CodingCorner | Collaborate in Real-Time, Build Together</title>
+          <link
+            href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap"
+            rel="stylesheet"
+          />
+          <link
+            href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Roboto:wght@400;700&display=swap"
+            rel="stylesheet"
+          />
           
           <link
             rel="stylesheet"
