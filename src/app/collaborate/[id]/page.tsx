@@ -1,8 +1,8 @@
+
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import Editor, { Monaco } from "@monaco-editor/react";
-import * as monaco from "monaco-editor";
 import { usePlaygroundState } from "@/context/playgroundProvider";
 import toast from "react-hot-toast";
 import { getSocket } from "@/config/socket";
@@ -18,99 +18,70 @@ const CollaborativePage: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [code, setCode] = useState<string>("//Write your code here");
   const [client, setClient] = useState<Client[]>([]);
-  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+  const editorRef = useRef<any>(null);
   const { user } = usePlaygroundState();
   const [language, setLanguage] = useState("javascript");
-
+  const socketRef = useRef<any>(null); // Store socket instance in ref
   const params = useParams() as { id: string };
   const { id } = params;
 
-  const socket = useMemo(() => {
-    const socketInstance = getSocket();
-    return socketInstance.connect();
-  }, []);
-
-   const lastEmittedCodeRef = useRef(code);
-
   useEffect(() => {
-    if (user && id && socket) {
-      const handleConnect = async () => {
-        console.log("Connected to server");
-        socket.emit("join", { id, user });
+    const socket = getSocket();
+    socketRef.current = socket;
 
-        socket.on("joined", ({ clients, username, socketId }) => {
-          console.log("Clients in room:", clients);
-          if (username !== user?.username) {
-            toast.success(`${username} joined!`);
-          }
-          setClient(clients);
+    if (user && id) {
+      console.log("Connecting to socket...");
+      socket.connect();
+      socket.emit("join", { id, user });
 
-          // Sync code only if code is different
-          if (lastEmittedCodeRef.current !== code) {
-            socket.emit("syncCode", {
-              code: code,
-              socketId,
-            });
-            lastEmittedCodeRef.current = code; // Update the last emitted code
-          }
-        });
+      socket.on("joined", ({ clients, username, socketId }) => {
+        console.log("Clients in room:", clients);
+        if (username !== user?.username) {
+          toast.success(`${username} joined!`);
+        }
+        setClient(clients);
 
-        socket.on("disconnected", ({ socketId, username }) => {
-          toast.error(`${username} left!`);
-          setClient((prev) => prev.filter((client) => client.socketId !== socketId));
-        });
+        // Sync code with the new user
+        if (clients.length > 1) {
+          socket.emit("syncCode", { socketId, code });
+        }
+      });
 
-        socket.on("codeChange", (newCode) => {
-          console.log("Received code change:", newCode);
-          setCode(newCode);
-          if (editorRef.current) {
-            editorRef.current.setValue(newCode);
-          }
-        });
+      socket.on("disconnected", ({ socketId, username }) => {
+        toast.error(`${username} left!`);
+        setClient((prev) => prev.filter((c) => c.socketId !== socketId));
+      });
 
-        socket.on("changeLanguage", (newLanguage) => {
-          setLanguage(newLanguage);
-        });
-      };
+      socket.on("codeChange", (newCode) => {
+        console.log("Received code change:", newCode);
+        setCode(newCode);
+        if (editorRef.current) {
+          editorRef.current.setValue(newCode);
+        }
+      });
 
-      socket.on("connect", handleConnect); 
+      socket.on("changeLanguage", (newLanguage) => {
+        setLanguage(newLanguage);
+      });
 
       return () => {
-        console.log("Cleaning up socket connection");
-        socket.off("connect", handleConnect);
+        console.log("Cleaning up socket connection...");
+        socket.disconnect();
         socket.off("joined");
         socket.off("disconnected");
         socket.off("codeChange");
         socket.off("changeLanguage");
         socket.off("syncCode");
-        socket.disconnect();
       };
     }
-  }, [user, id, socket]);
-
-  useEffect(() => {
-    const handleResize = () => {
-      if (editorRef.current) {
-        editorRef.current.layout();
-      }
-    };
-
-    window.addEventListener("resize", handleResize);
-
-    return () => {
-      window.removeEventListener("resize", handleResize);
-    };
-  }, []);
-
-  const toggleSidebar = () => {
-    setSidebarOpen(!sidebarOpen);
-  };
-
+  }, [user, id]);
+ 
+  
   const handleEditorChange = (value: string | undefined) => {
-    if (value !== undefined && typeof value === "string") {
+    if (value !== undefined && socketRef.current) {
       console.log("Emitting code change:", { id, code: value });
       setCode(value);
-      socket.emit("codeChange", { id, code: value });
+      socketRef.current.emit("codeChange", { id, code: value });
     }
   };
 
@@ -118,29 +89,15 @@ const CollaborativePage: React.FC = () => {
     const newLanguage = e.target.value;
     console.log("Emitting language change:", { id, language: newLanguage });
     setLanguage(newLanguage);
-    socket.emit("changeLanguage", { id, language: newLanguage });
+    socketRef.current.emit("changeLanguage", { id, language: newLanguage });
   };
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-700">
-      <Sidebar
-        sidebarOpen={sidebarOpen}
-        toggleSidebar={toggleSidebar}
-        client={client}
-        id={id}
-      />
-
-      <div
-        className={`flex-grow flex flex-col ${
-          sidebarOpen ? "ml-64" : "ml-16"
-        } transition-margin duration-300 ease-in-out`}
-      >
+      <Sidebar sidebarOpen={sidebarOpen} toggleSidebar={() => setSidebarOpen(!sidebarOpen)} client={client} id={id} />
+      <div className={`flex-grow flex flex-col ${sidebarOpen ? "ml-64" : "ml-16"} transition-margin duration-300 ease-in-out`}>
         <div className="flex items-center justify-between p-4 bg-gray-900 text-white">
-          <select
-            className="bg-gray-200 text-black font-bold py-2 px-4 rounded"
-            value={language}
-            onChange={changeLanguage}
-          >
+          <select className="bg-gray-200 text-black font-bold py-2 px-4 rounded" value={language} onChange={changeLanguage}>
             <option value="javascript">JavaScript</option>
             <option value="python">Python</option>
             <option value="cpp">C++</option>

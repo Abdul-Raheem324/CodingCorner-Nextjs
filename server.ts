@@ -38,7 +38,8 @@ app.prepare().then(() => {
         });
       });
     });
-
+    
+    
     socket.on("disconnecting", () => {
       const rooms = [...socket.rooms];
       rooms.forEach((roomId) => {
