@@ -44,6 +44,12 @@
   - **JWT (JSON Web Tokens)**: Used for secure user authentication and token management.
 
 ---
+## 🎥 Project demo Video
+
+Watch the full project demo here:  
+👉 [Click to Watch the Project Video](https://www.youtube.com/watch?v=VSo4T7qc-c0)
+
+
 
 ## Screenshots
 
