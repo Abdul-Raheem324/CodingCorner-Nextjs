@@ -30,12 +30,12 @@ const CollaborativePage: React.FC = () => {
     socketRef.current = socket;
 
     if (user && id) {
-      console.log("Connecting to socket...");
+      // console.log("Connecting to socket...");
       socket.connect();
       socket.emit("join", { id, user });
 
       socket.on("joined", ({ clients, username, socketId }) => {
-        console.log("Clients in room:", clients);
+        // console.log("Clients in room:", clients);
         if (username !== user?.username) {
           toast.success(`${username} joined!`);
         }
@@ -53,7 +53,7 @@ const CollaborativePage: React.FC = () => {
       });
 
       socket.on("codeChange", (newCode) => {
-        console.log("Received code change:", newCode);
+        // console.log("Received code change:", newCode);
         setCode(newCode);
         if (editorRef.current) {
           editorRef.current.setValue(newCode);
@@ -65,7 +65,7 @@ const CollaborativePage: React.FC = () => {
       });
 
       return () => {
-        console.log("Cleaning up socket connection...");
+        // console.log("Cleaning up socket connection...");
         socket.disconnect();
         socket.off("joined");
         socket.off("disconnected");
@@ -79,7 +79,7 @@ const CollaborativePage: React.FC = () => {
   
   const handleEditorChange = (value: string | undefined) => {
     if (value !== undefined && socketRef.current) {
-      console.log("Emitting code change:", { id, code: value });
+      // console.log("Emitting code change:", { id, code: value });
       setCode(value);
       socketRef.current.emit("codeChange", { id, code: value });
     }
@@ -87,7 +87,7 @@ const CollaborativePage: React.FC = () => {
 
   const changeLanguage = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newLanguage = e.target.value;
-    console.log("Emitting language change:", { id, language: newLanguage });
+    // console.log("Emitting language change:", { id, language: newLanguage });
     setLanguage(newLanguage);
     socketRef.current.emit("changeLanguage", { id, language: newLanguage });
   };
