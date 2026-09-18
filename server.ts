@@ -1,17 +1,25 @@
 // node --loader ts-node/esm server.ts  --> Use this to run the serverfile locally
+import "dotenv/config";
 import { createServer } from "http";
 import { Server } from "socket.io";
 
 type UserSocketMap = Record<string, string>;
 
-const port = 3001;
+const port = Number(process.env.PORT) || 3001;
 const userSocketMap: UserSocketMap = {};
 
 const httpServer = createServer();
 
+const allowedOrigins = [
+  "http://localhost:3000",
+  process.env.CLIENT_URL,
+  process.env.FRONTEND_URL,
+  process.env.NEXT_PUBLIC_APP_URL,
+].filter(Boolean) as string[];
+
 const io = new Server(httpServer, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: allowedOrigins.length > 0 ? allowedOrigins : "*",
     methods: ["GET", "POST"],
     credentials: true,
   },

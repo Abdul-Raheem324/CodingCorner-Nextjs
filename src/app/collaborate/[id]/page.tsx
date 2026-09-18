@@ -1,13 +1,15 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Editor, { Monaco } from "@monaco-editor/react";
 import { usePlaygroundState } from "@/context/playgroundProvider";
 import toast from "react-hot-toast";
 import { getSocket } from "@/config/socket";
 import { useParams } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
+import type * as MonacoEditor from "monaco-editor";
+import type { Socket } from "socket.io-client";
 
 type Client = {
   username: string;
@@ -18,10 +20,10 @@ const CollaborativePage: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [code, setCode] = useState<string>("//Write your code here");
   const [client, setClient] = useState<Client[]>([]);
-  const editorRef = useRef<any>(null);
+  const editorRef = useRef<MonacoEditor.editor.IStandaloneCodeEditor | null>(null);
   const { user } = usePlaygroundState();
   const [language, setLanguage] = useState("javascript");
-  const socketRef = useRef<any>(null); // Store socket instance in ref
+  const socketRef = useRef<Socket | null>(null); // Store socket instance in ref
   const params = useParams() as { id: string };
   const { id } = params;
 
@@ -89,7 +91,7 @@ const CollaborativePage: React.FC = () => {
     const newLanguage = e.target.value;
     // console.log("Emitting language change:", { id, language: newLanguage });
     setLanguage(newLanguage);
-    socketRef.current.emit("changeLanguage", { id, language: newLanguage });
+    socketRef.current?.emit("changeLanguage", { id, language: newLanguage });
   };
 
   return (
