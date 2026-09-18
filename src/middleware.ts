@@ -1,26 +1,38 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-export function middleware(req:NextRequest) {
+export function middleware(req: NextRequest) {
     const path = req.nextUrl.pathname;
     
-    const publicPath = path === "/login" || path === "/signup" || path === "/"
-    const token = req.cookies.get('token')?.value || ''
-
-    if(publicPath && token && path !=="/") {
-        return NextResponse.redirect(new URL(`/home`,req.nextUrl))
+    // Ignore internal next files, static assets, and api routes
+    if (
+        path.startsWith("/_next") ||
+        path.startsWith("/api") ||
+        path.startsWith("/static") ||
+        path.includes(".")
+    ) {
+        return NextResponse.next();
     }
-    if(!publicPath && !token) {
-        return NextResponse.redirect(new URL(`/login`,req.nextUrl))
+
+    const isPublicPath = path === "/login" || path === "/signup" || path === "/" || path.startsWith("/collaborate");
+    const token = req.cookies.get('token')?.value || '';
+
+    if ((path === "/login" || path === "/signup") && token) {
+        return NextResponse.redirect(new URL(`/home`, req.nextUrl));
+    }
+    if (!isPublicPath && !token) {
+        return NextResponse.redirect(new URL(`/login`, req.nextUrl));
     }
     return NextResponse.next();
 }
+
 export const config = {
-    matcher:[
+    matcher: [
       '/',
       '/login',
       '/signup',
       '/home',
-      '/collaborate/:path*'
+      '/collaborate/:path*',
+      '/ide/:path*'
     ]
-  }
+}

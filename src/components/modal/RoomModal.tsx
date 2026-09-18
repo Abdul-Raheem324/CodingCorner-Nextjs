@@ -30,14 +30,7 @@ export default function KeepMountedModal() {
   const handleJoin = () => {
     setLoading(true);
     if (roomId.trim()) {
-    //   socket.emit("verifyRoom", { roomId }, (response: { valid: false; }) => {
-    //     setLoading(false);
-    //     if (response.valid) {
-          router.push(`collaborate/${roomId}`);
-        // } else {
-        //   toast.error("Invalid room ID.");
-        
-      // });
+      router.push(`/collaborate/${roomId}`);
     } else {
       toast.error("Please enter a valid room ID.");
       setLoading(false);

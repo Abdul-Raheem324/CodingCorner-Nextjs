@@ -73,38 +73,173 @@ function HomePage() {
             Learn to code from scratch and unleash your creativity with every
             line.
           </p>
-          <div>
-            <button className="flex gap-2 items-center text-[#54454e] shadow-xl text-sm md:text-lg bg-gray-50 backdrop-blur-md lg:font-semibold isolation-auto before:absolute before:w-full before:transition-all before:duration-700 before:hover:w-full before:-left-full before:hover:left-0 before:rounded-full before:bg-sky-500 hover:text-gray-50 before:-z-10 before:aspect-square before:hover:scale-150 before:hover:duration-700 relative z-10 px-3 py-1 md:px-4 md:py-2 overflow-hidden border-2 rounded-full group">
-              {user ? (
-                <Link href={"/home"}>Start Coding!</Link>
-              ) : (
-                <Link href={"/login"}>Get Started</Link>
-              )}
-              <svg
-                className="w-6 h-6 md:w-8 md:h-8 justify-end group-hover:rotate-90 group-hover:bg-gray-50 text-gray-50 ease-linear duration-300 rounded-full border border-gray-700 group-hover:border-none p-1 md:p-2 rotate-45"
-                viewBox="0 0 16 19"
-                xmlns="http://www.w3.org/2000/svg"
+          <div className="flex flex-wrap items-center gap-3 pt-2">
+            {user ? (
+              <Link
+                href="/home"
+                className="px-5 py-2.5 bg-[#3b82f5] hover:bg-[#2563eb] text-white font-semibold rounded-md shadow-md transition-colors duration-150 text-sm md:text-base"
               >
-                <path
-                  d="M7 18C7 18.5523 7.44772 19 8 19C8.55228 19 9 18.5523 9 18H7ZM8.70711 0.292893C8.31658 -0.0976311 7.68342 -0.0976311 7.29289 0.292893L0.928932 6.65685C0.538408 7.04738 0.538408 7.68054 0.928932 8.07107C1.31946 8.46159 1.95262 8.46159 2.34315 8.07107L8 2.41421L13.6569 8.07107C14.0474 8.46159 14.6805 8.46159 15.0711 8.07107C15.4616 7.68054 15.4616 7.04738 15.0711 6.65685L8.70711 0.292893ZM9 18L9 1H7L7 18H9Z"
-                  className="fill-gray-800 group-hover:fill-gray-800"
-                ></path>
-              </svg>
-            </button>
+                Start Coding!
+              </Link>
+            ) : (
+              <Link
+                href="/login"
+                className="px-5 py-2.5 bg-[#3b82f5] hover:bg-[#2563eb] text-white font-semibold rounded-md shadow-md transition-colors duration-150 text-sm md:text-base"
+              >
+                Get Started
+              </Link>
+            )}
           </div>
         </div>
 
-        <div className="flex justify-center items-center p-4 md:p-8 flex-1">
-          <Image
-            src="/illustration.png"
-            className="w-full max-w-xs md:max-w-md lg:max-w-lg xl:max-w-4xl object-contain"
-            alt="Coding Illustration"
-            width={640}
-            height={480}
-            quality={100}
-            priority={true}
-          />
+        {/* Right: Animated mock code editor + CTA */}
+        <div className="flex flex-col justify-center items-center gap-4 p-4 md:p-8 flex-1">
+          <MockEditor />
+
+          {/* Live Collaboration CTA — anchored right below the editor */}
+          <div className="flex flex-col items-center gap-1.5">
+            <Link
+              href="/collaborate"
+              className="flex items-center gap-2.5 px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-lg shadow-lg transition-colors duration-150 text-sm"
+            >
+              <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+              Try Live Collaboration
+              <span className="text-slate-400 text-xs font-normal">→</span>
+            </Link>
+            <p className="text-[11px] text-slate-400">No account needed · Free forever</p>
+          </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+const CODE_LINES = [
+  { tokens: [{ text: "function ", color: "#c792ea" }, { text: "greet", color: "#82aaff" }, { text: "(", color: "#89ddff" }, { text: "name", color: "#f78c6c" }, { text: ") {", color: "#89ddff" }] },
+  { tokens: [{ text: "  const ", color: "#c792ea" }, { text: "msg", color: "#eeffff" }, { text: " = ", color: "#89ddff" }, { text: "`Hello, ", color: "#c3e88d" }, { text: "${", color: "#89ddff" }, { text: "name", color: "#f78c6c" }, { text: "}", color: "#89ddff" }, { text: "!`", color: "#c3e88d" }] },
+  { tokens: [{ text: "  console", color: "#eeffff" }, { text: ".", color: "#89ddff" }, { text: "log", color: "#82aaff" }, { text: "(msg);", color: "#89ddff" }] },
+  { tokens: [{ text: "}", color: "#89ddff" }] },
+  { tokens: [] },
+  { tokens: [{ text: "// 👥 Alice joined the session", color: "#546e7a" }] },
+  { tokens: [{ text: "greet", color: "#82aaff" }, { text: "(", color: "#89ddff" }, { text: '"World"', color: "#c3e88d" }, { text: ");", color: "#89ddff" }] },
+];
+
+const CURSORS = [
+  { name: "Alice", color: "#f472b6", line: 6 },
+  { name: "Bob",   color: "#34d399", line: 3 },
+];
+
+function MockEditor() {
+  const [visibleLines, setVisibleLines] = useState(0);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    if (visibleLines >= CODE_LINES.length) return;
+    const id = setTimeout(() => setVisibleLines((v) => v + 1), 340);
+    return () => clearTimeout(id);
+  }, [visibleLines]);
+
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 530);
+    return () => clearInterval(id);
+  }, []);
+
+  const cursorVisible = tick % 2 === 0;
+
+  return (
+    <div className="w-full max-w-md rounded-xl overflow-hidden shadow-2xl border border-slate-700/60 font-mono text-sm select-none">
+      <div className="bg-[#1e1e2e] px-4 py-2.5 flex items-center gap-2 border-b border-slate-700/50">
+        <span className="w-3 h-3 rounded-full bg-red-500/80" />
+        <span className="w-3 h-3 rounded-full bg-yellow-400/80" />
+        <span className="w-3 h-3 rounded-full bg-green-500/80" />
+        <span className="ml-3 text-xs text-slate-400">index.js — CodingCorner</span>
+        <div className="ml-auto flex items-center gap-1.5">
+          {CURSORS.map((c) => (
+            <span
+              key={c.name}
+              className="text-[10px] font-sans px-2 py-0.5 rounded-full font-semibold"
+              style={{
+                background: c.color + "28",
+                color: c.color,
+                border: `1px solid ${c.color}55`,
+              }}
+            >
+              {c.name}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-[#1e1e2e] px-0 py-3">
+        {CODE_LINES.map((line, lineIdx) => {
+          const isVisible = lineIdx < visibleLines;
+          const isTyping = lineIdx === visibleLines;
+          const cursorOnLine = CURSORS.filter((c) => c.line === lineIdx);
+
+          return (
+            <div
+              key={lineIdx}
+              className="flex items-center px-4 py-[2px] leading-6 min-h-[24px] hover:bg-white/[0.03] transition-colors"
+            >
+              <span className="w-6 text-right text-[#3d3d5c] text-xs mr-4 shrink-0">
+                {lineIdx + 1}
+              </span>
+
+              <span className="flex flex-wrap items-center">
+                {isVisible &&
+                  line.tokens.map((tok, ti) => (
+                    <span key={ti} style={{ color: tok.color }}>
+                      {tok.text}
+                    </span>
+                  ))}
+
+                {isTyping && (
+                  <span
+                    className="inline-block w-[2px] h-[14px] ml-0.5 rounded-sm align-middle"
+                    style={{
+                      background: "#60a5fa",
+                      opacity: cursorVisible ? 1 : 0,
+                      transition: "opacity 0.1s",
+                    }}
+                  />
+                )}
+
+                {isVisible &&
+                  cursorOnLine.map((c) => (
+                    <span
+                      key={c.name}
+                      className="relative inline-flex items-center ml-0.5"
+                    >
+                      <span
+                        className="inline-block w-[2px] h-[14px] rounded-sm"
+                        style={{
+                          background: c.color,
+                          opacity: cursorVisible ? 1 : 0,
+                          transition: "opacity 0.1s",
+                        }}
+                      />
+                      <span
+                        className="absolute -top-4 left-0 text-[9px] font-sans px-1 rounded whitespace-nowrap font-semibold"
+                        style={{ background: c.color, color: "#fff" }}
+                      >
+                        {c.name}
+                      </span>
+                    </span>
+                  ))}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="bg-[#181825] px-4 py-1.5 flex items-center gap-3 border-t border-slate-700/50">
+        <span className="flex items-center gap-1.5 text-[10px] text-green-400 font-sans">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+          {CURSORS.length + 1} collaborators online
+        </span>
+        <span className="ml-auto text-[10px] text-slate-500 font-sans">
+          JavaScript
+        </span>
       </div>
     </div>
   );

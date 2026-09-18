@@ -2,12 +2,11 @@
   "name": "codeeditor",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "server": "node --loader ts-node/esm server.ts",
+    "server": "ts-node -P tsconfig.server.json server.ts",
     "lint": "next lint"
   },
   "dependencies": {

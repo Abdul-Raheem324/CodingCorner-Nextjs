@@ -9,6 +9,8 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 
+import { usePlaygroundState } from "@/context/playgroundProvider";
+
 interface SidebarProps {
   sidebarOpen: boolean;
   toggleSidebar: () => void;
@@ -18,6 +20,7 @@ interface SidebarProps {
 
 function Sidebar({ sidebarOpen, toggleSidebar, client, id }: SidebarProps) {
   const router = useRouter();
+  const { user } = usePlaygroundState();
 
   const handleCopyRoomId = () => {
     try {
@@ -35,7 +38,11 @@ function Sidebar({ sidebarOpen, toggleSidebar, client, id }: SidebarProps) {
   };
 
   const leaveRoom = () => {
-    router.push("/home");
+    if (user) {
+      router.push("/home");
+    } else {
+      router.push("/");
+    }
   };
 
   return (
