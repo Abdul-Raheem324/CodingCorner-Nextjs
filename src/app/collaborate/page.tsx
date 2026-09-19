@@ -9,146 +9,171 @@ import toast from "react-hot-toast";
 import { usePlaygroundState } from "@/context/playgroundProvider";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faUsers,
-  faPlus,
-  faSignInAlt,
-  faArrowLeft,
-  faRandom,
-  faCircleQuestion,
-  faCode,
-  faLock,
-  faBolt,
-  faGlobe,
+  faUsers, faPlus, faSignInAlt, faArrowLeft, faRandom, faCircleQuestion,
 } from "@fortawesome/free-solid-svg-icons";
 import Tooltip from "@mui/material/Tooltip";
 
-/* ─────────────────────────────────────────────
-   Animated floating particle background
-───────────────────────────────────────────── */
-interface Particle {
-  id: number;
-  x: number;
-  y: number;
-  size: number;
-  speedX: number;
-  speedY: number;
-  opacity: number;
-}
+/* ── Syntax palette (light / GitHub theme) ── */
+const K = "#d73a49"; // keyword
+const F = "#6f42c1"; // function / builtin
+const S = "#032f62"; // string
+const C = "#6a737d"; // comment
+const N = "#005cc5"; // number
+const P = "#24292e"; // default
 
-function ParticleCanvas() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+type User = "Alice" | "Bob" | "Sam";
+interface Token   { text: string; color: string }
+interface CodeLine { tokens: Token[]; user: User | null; delay: number }
+
+const USERS: Record<User, { color: string; bg: string }> = {
+  Alice: { color: "#e11d48", bg: "#fff1f2" },
+  Bob:   { color: "#2563eb", bg: "#eff6ff" },
+  Sam:   { color: "#059669", bg: "#f0fdf4" },
+};
+
+/* ── Python code — plain, no framework ── */
+const LINES: CodeLine[] = [
+  { tokens: [{ text: "# scores.py  —  live session",               color: C }],                                                                                                 user: "Bob",   delay: 100  },
+  { tokens: [{ text: "scores", color: P }, { text: " = [", color: P }, { text: "42", color: N }, { text: ", ", color: P }, { text: "85", color: N }, { text: ", ", color: P }, { text: "91", color: N }, { text: ", ", color: P }, { text: "67", color: N }, { text: ", ", color: P }, { text: "78", color: N }, { text: "]", color: P }],  user: "Bob",   delay: 380  },
+  { tokens: [],                                                                                                                                                                   user: null,    delay: 630  },
+  { tokens: [{ text: "def ", color: K }, { text: "analyze", color: F }, { text: "(data):", color: P }],                                                                         user: "Alice", delay: 820  },
+  { tokens: [{ text: "    total", color: P }, { text: " = ", color: P }, { text: "sum", color: F }, { text: "(data)", color: P }],                                              user: "Alice", delay: 1060 },
+  { tokens: [{ text: "    avg", color: P }, { text: " = total / ", color: P }, { text: "len", color: F }, { text: "(data)", color: P }],                                        user: "Sam",   delay: 1290 },
+  { tokens: [{ text: "    best", color: P }, { text: " = ", color: P }, { text: "max", color: F }, { text: "(data)", color: P }],                                               user: "Sam",   delay: 1520 },
+  { tokens: [{ text: "    ", color: P }, { text: "return ", color: K }, { text: "avg, best", color: P }],                                                                       user: "Alice", delay: 1750 },
+  { tokens: [],                                                                                                                                                                   user: null,    delay: 2000 },
+  { tokens: [{ text: "avg, best", color: P }, { text: " = ", color: P }, { text: "analyze", color: F }, { text: "(scores)", color: P }],                                        user: "Bob",   delay: 2180 },
+  { tokens: [],                                                                                                                                                                   user: null,    delay: 2420 },
+  { tokens: [{ text: "print", color: F }, { text: '(f"Average : {avg:.1f}")', color: S }],                                                                                      user: "Alice", delay: 2600 },
+  { tokens: [{ text: "print", color: F }, { text: '(f"Top Score: {best}")',    color: S }],                                                                                     user: "Sam",   delay: 2840 },
+];
+
+/* ── Animated Editor ── */
+function CollabEditor() {
+  const [revealed, setRevealed] = useState<boolean[]>(Array(LINES.length).fill(false));
+  const [tick, setTick]         = useState(0);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const resize = () => {
-      canvas.width = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
-    resize();
-    window.addEventListener("resize", resize);
-
-    const particles: Particle[] = Array.from({ length: 55 }, (_, i) => ({
-      id: i,
-      x: Math.random() * window.innerWidth,
-      y: Math.random() * window.innerHeight,
-      size: Math.random() * 2.5 + 0.5,
-      speedX: (Math.random() - 0.5) * 0.35,
-      speedY: (Math.random() - 0.5) * 0.35,
-      opacity: Math.random() * 0.45 + 0.1,
-    }));
-
-    let animId: number;
-
-    const draw = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      particles.forEach((p) => {
-        p.x += p.speedX;
-        p.y += p.speedY;
-        if (p.x < 0) p.x = canvas.width;
-        if (p.x > canvas.width) p.x = 0;
-        if (p.y < 0) p.y = canvas.height;
-        if (p.y > canvas.height) p.y = 0;
-
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(147,197,253,${p.opacity})`;
-        ctx.fill();
-      });
-
-      // Draw faint connecting lines between nearby particles
-      for (let i = 0; i < particles.length; i++) {
-        for (let j = i + 1; j < particles.length; j++) {
-          const dx = particles[i].x - particles[j].x;
-          const dy = particles[i].y - particles[j].y;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          if (dist < 120) {
-            ctx.beginPath();
-            ctx.strokeStyle = `rgba(147,197,253,${0.06 * (1 - dist / 120)})`;
-            ctx.lineWidth = 0.6;
-            ctx.moveTo(particles[i].x, particles[i].y);
-            ctx.lineTo(particles[j].x, particles[j].y);
-            ctx.stroke();
-          }
-        }
-      }
-
-      animId = requestAnimationFrame(draw);
-    };
-
-    draw();
-    return () => {
-      cancelAnimationFrame(animId);
-      window.removeEventListener("resize", resize);
-    };
+    const timers = LINES.map((_, i) =>
+      setTimeout(() => setRevealed(prev => { const n = [...prev]; n[i] = true; return n; }), LINES[i].delay)
+    );
+    return () => timers.forEach(clearTimeout);
   }, []);
 
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 550);
+    return () => clearInterval(id);
+  }, []);
+
+  const cursorOn  = tick % 2 === 0;
+  const allDone   = revealed.every(Boolean);
+  const activeIdx = revealed.findIndex(r => !r);
+
+  // Last revealed line per user
+  const lastLine: Record<User, number> = { Alice: -1, Bob: -1, Sam: -1 };
+  revealed.forEach((r, i) => { if (r && LINES[i].user) lastLine[LINES[i].user as User] = i; });
+
   return (
-    <canvas
-      ref={canvasRef}
-      className="fixed inset-0 pointer-events-none z-0"
-    />
+    <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl border border-slate-200/80 bg-white select-none font-mono text-[12.5px]">
+
+      {/* Title bar */}
+      <div className="bg-[#f6f8fa] px-4 py-2.5 flex items-center gap-2 border-b border-slate-200">
+        <span className="w-3 h-3 rounded-full bg-red-400/90" />
+        <span className="w-3 h-3 rounded-full bg-yellow-400/90" />
+        <span className="w-3 h-3 rounded-full bg-green-500/90" />
+        <div className="ml-3 flex items-center gap-1.5 px-3 py-1 bg-white rounded-md border border-slate-200 text-[11px] text-slate-500 font-sans">
+          <span>🐍</span>
+          <span className="font-medium">scores.py</span>
+        </div>
+        <div className="ml-auto flex items-center gap-1.5">
+          {(Object.keys(USERS) as User[]).map(u => (
+            <span key={u} className="text-[10px] font-sans font-semibold px-2 py-0.5 rounded-full"
+              style={{ color: USERS[u].color, background: USERS[u].bg, border: `1px solid ${USERS[u].color}35` }}>
+              {u}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Code area */}
+      <div className="bg-white py-2">
+        {LINES.map((line, idx) => {
+          const isRevealed   = revealed[idx];
+          const isActive     = idx === activeIdx;
+          const cursorsHere  = (Object.keys(lastLine) as User[]).filter(u => lastLine[u] === idx);
+          const firstCursor  = cursorsHere[0];
+
+          return (
+            <div key={idx}
+              className="flex items-center px-4 min-h-[22px] leading-[22px]"
+              style={{
+                backgroundColor: firstCursor ? USERS[firstCursor].bg + "88" : "transparent",
+                transition: "background-color 0.5s ease",
+              }}
+            >
+              {/* Line number */}
+              <span className="w-6 shrink-0 mr-4 text-right text-[11px] text-slate-300 select-none font-sans">
+                {idx + 1}
+              </span>
+
+              {/* Tokens + cursors */}
+              <span className="whitespace-pre"
+                style={{ opacity: isRevealed ? 1 : 0, transition: "opacity 0.4s ease" }}>
+                {line.tokens.map((tok, ti) => (
+                  <span key={ti} style={{ color: tok.color }}>{tok.text}</span>
+                ))}
+
+                {/* Per-user cursors with smooth blink */}
+                {isRevealed && cursorsHere.map(u => (
+                  <span key={u} className="relative inline-flex items-center ml-0.5">
+                    <span className="inline-block w-[2px] h-[13px] rounded-sm"
+                      style={{ background: USERS[u].color, opacity: cursorOn ? 1 : 0, transition: "opacity 0.2s ease-in-out" }} />
+                    <span className="absolute -top-[18px] left-0 text-[9px] font-sans font-semibold px-1.5 py-px rounded whitespace-nowrap text-white"
+                      style={{ background: USERS[u].color, transition: "all 0.3s ease" }}>
+                      {u}
+                    </span>
+                  </span>
+                ))}
+              </span>
+
+              {/* Generic typing cursor on the next unrevealed line */}
+              {isActive && (
+                <span className="inline-block w-[2px] h-[13px] rounded-sm ml-1 align-middle"
+                  style={{ background: "#94a3b8", opacity: cursorOn ? 1 : 0, transition: "opacity 0.2s ease-in-out" }} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Status bar */}
+      <div className="bg-[#f6f8fa] border-t border-slate-200 px-4 py-1.5 flex items-center gap-3">
+        <span className="flex items-center gap-1.5 text-[10px] font-sans text-slate-500">
+          <span className={`w-1.5 h-1.5 rounded-full ${allDone ? "bg-green-500" : "bg-blue-500 animate-pulse"}`} />
+          {allDone ? "✓  All changes synced" : "3 collaborators editing…"}
+        </span>
+        <span className="ml-auto text-[10px] font-sans text-slate-400">Python 3</span>
+      </div>
+    </div>
   );
 }
 
-/* ─────────────────────────────────────────────
-   Feature badge chips
-───────────────────────────────────────────── */
-const features = [
-  { icon: faBolt, label: "Real-time sync", color: "text-yellow-400" },
-  { icon: faLock, label: "Secure rooms", color: "text-green-400" },
-  { icon: faGlobe, label: "No account needed", color: "text-blue-400" },
-  { icon: faCode, label: "Multi-language", color: "text-purple-400" },
-];
-
-/* ─────────────────────────────────────────────
-   Main Page
-───────────────────────────────────────────── */
+/* ── Main Page ── */
 export default function CollaborateLobbyPage() {
   const router = useRouter();
   const { user } = usePlaygroundState();
 
-  const [roomId, setRoomId] = useState("");
+  const [roomId,      setRoomId]      = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [isCreating,  setIsCreating]  = useState(false);
 
   useEffect(() => {
-    setMounted(true);
     if (user?.username) {
       setDisplayName(user.username);
     } else {
-      const saved = localStorage.getItem("collab_username");
+      const saved = sessionStorage.getItem("collab_username") || localStorage.getItem("collab_username");
       if (saved) {
         setDisplayName(saved);
-      } else {
-        const randomNick = `Coder-${Math.floor(1000 + Math.random() * 9000)}`;
-        setDisplayName(randomNick);
-        localStorage.setItem("collab_username", randomNick);
       }
     }
   }, [user]);
@@ -156,324 +181,187 @@ export default function CollaborateLobbyPage() {
   const handleNameChange = (name: string) => {
     setDisplayName(name);
     if (name.trim()) {
+      sessionStorage.setItem("collab_username", name.trim());
       localStorage.setItem("collab_username", name.trim());
     }
   };
 
   const generateRandomName = () => {
-    const randomNick = `Coder-${Math.floor(1000 + Math.random() * 9000)}`;
-    setDisplayName(randomNick);
-    localStorage.setItem("collab_username", randomNick);
-    toast.success(`Nickname set to ${randomNick}`);
+    const nick = `Coder-${Math.floor(1000 + Math.random() * 9000)}`;
+    setDisplayName(nick);
+    sessionStorage.setItem("collab_username", nick);
+    localStorage.setItem("collab_username", nick);
+    toast.success(`Nickname set to ${nick}`);
   };
 
   const handleCreateRoom = () => {
-    if (!displayName.trim()) {
-      toast.error("Please enter a display name first.");
-      return;
-    }
+    const finalName = displayName.trim() || `Coder-${Math.floor(1000 + Math.random() * 9000)}`;
+    sessionStorage.setItem("collab_username", finalName);
+    localStorage.setItem("collab_username", finalName);
     setIsCreating(true);
-    const newId = uuidv4();
-    toast.success("Creating collaboration room...");
-    router.push(`/collaborate/${newId}`);
+    router.push(`/collaborate/${uuidv4()}`);
   };
 
   const handleJoinRoom = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!displayName.trim()) {
-      toast.error("Please enter a display name first.");
-      return;
-    }
+    let id = roomId.trim();
+    if (!id) { toast.error("Please enter a valid Room ID."); return; }
+    if (id.includes("/collaborate/")) id = id.split("/collaborate/").at(-1)!;
+    const finalName = displayName.trim() || `Coder-${Math.floor(1000 + Math.random() * 9000)}`;
+    sessionStorage.setItem("collab_username", finalName);
+    localStorage.setItem("collab_username", finalName);
+    router.push(`/collaborate/${id}`);
+  };
 
-    let cleanedRoomId = roomId.trim();
-    if (!cleanedRoomId) {
-      toast.error("Please enter a valid Room ID.");
-      return;
-    }
+  /* ── 3D Tilt on editor ── */
+  const tiltRef = useRef<HTMLDivElement>(null);
 
-    // Support pasted URLs
-    if (cleanedRoomId.includes("/collaborate/")) {
-      const parts = cleanedRoomId.split("/collaborate/");
-      cleanedRoomId = parts[parts.length - 1];
-    }
+  const handleTiltMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const el = tiltRef.current;
+    if (!el) return;
+    const { left, top, width, height } = el.getBoundingClientRect();
+    const x = (e.clientX - left - width  / 2) / (width  / 2); // -1 to 1
+    const y = (e.clientY - top  - height / 2) / (height / 2); // -1 to 1
+    const rotY =  x * 13;
+    const rotX = -y * 9;
+    el.style.transform  = `perspective(900px) rotateX(${rotX}deg) rotateY(${rotY}deg) scale(1.03)`;
+    el.style.boxShadow  = `${-x * 22}px ${-y * 22}px 48px rgba(0,0,0,0.16), 0 4px 20px rgba(0,0,0,0.08)`;
+    el.style.transition = "transform 0.1s ease-out, box-shadow 0.1s ease-out";
+  };
 
-    router.push(`/collaborate/${cleanedRoomId}`);
+  const handleTiltLeave = () => {
+    const el = tiltRef.current;
+    if (!el) return;
+    el.style.transform  = "perspective(900px) rotateX(0deg) rotateY(0deg) scale(1)";
+    el.style.boxShadow  = "0 8px 32px rgba(0,0,0,0.10)";
+    el.style.transition = "transform 0.7s ease, box-shadow 0.7s ease";
   };
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-gray-200 flex flex-col font-Roboto overflow-hidden">
-      {/* Animated particle background */}
-      <ParticleCanvas />
+    <div className="w-full flex flex-col min-h-screen font-Roboto bg-[#e7f0fd]">
 
-      {/* Radial glow accents */}
-      <div className="pointer-events-none fixed inset-0 z-0">
-        <div className="absolute top-[-10%] left-[-5%] w-[480px] h-[480px] rounded-full bg-blue-600/10 blur-[120px]" />
-        <div className="absolute bottom-[-10%] right-[-5%] w-[420px] h-[420px] rounded-full bg-indigo-600/10 blur-[120px]" />
-        <div className="absolute top-[40%] left-[45%] w-[300px] h-[300px] rounded-full bg-cyan-500/5 blur-[100px]" />
+      {/* ── Navbar — identical to home page ── */}
+      <div className="shrink-0 w-full bg-white border-b flex justify-between items-center shadow-sm px-4 py-2 md:px-8">
+        <div className="flex items-center">
+          <Image src="/logo.png" alt="CodingCorner Logo" width={64} height={64} className="w-12 md:w-16" />
+          <h1 className="text-xl font-bebas md:text-2xl tracking-wide font-header">CodingCorner</h1>
+        </div>
+        <Link href={user ? "/home" : "/"}
+          className="flex items-center gap-2 text-sm text-blue-500 hover:bg-[#3b82f5] hover:text-white px-3 py-2 rounded-md transition-colors duration-150 font-semibold">
+          <FontAwesomeIcon icon={faArrowLeft} width={12} />
+          <span>{user ? "Dashboard" : "Home"}</span>
+        </Link>
       </div>
 
-      {/* ── Navbar ── */}
-      <nav className="relative z-10 w-full backdrop-blur-md bg-slate-900/60 border-b border-slate-700/50 px-6 py-4 flex justify-between items-center shadow-xl">
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="absolute inset-0 rounded-full bg-blue-500/20 blur-md animate-pulse" />
-            <Image
-              src="/logo.png"
-              alt="logo"
-              width={44}
-              height={44}
-              className="relative w-10 h-10 object-contain"
-              priority
-            />
-          </div>
-          <h1 className="text-2xl md:text-3xl font-bebas text-gray-100 tracking-wider font-header">
-            CodingCorner
-          </h1>
-          <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-green-500/15 border border-green-500/30 text-green-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-            LIVE
-          </span>
-        </div>
+      {/* ── Content: scrollable on mobile, fills viewport on desktop ── */}
+      <div className="flex flex-col lg:flex-row bg-[#e7f0fd] px-6 py-6 md:px-12 md:py-10 gap-10 lg:gap-12">
 
-        <Link
-          href={user ? "/home" : "/"}
-          className="flex items-center gap-2 text-sm font-medium text-gray-300 hover:text-white px-3 py-1.5 rounded-lg bg-slate-800/70 hover:bg-slate-700/80 border border-slate-600/60 transition-all duration-200 hover:shadow-lg hover:shadow-blue-900/20 group"
-        >
-          <FontAwesomeIcon
-            icon={faArrowLeft}
-            width={12}
-            className="transition-transform duration-200 group-hover:-translate-x-0.5"
-          />
-          <span>Back to {user ? "Dashboard" : "Home"}</span>
-        </Link>
-      </nav>
+        {/* ─── Left: forms ─── */}
+        <div className="flex flex-col justify-center flex-1">
 
-      {/* ── Main Content ── */}
-      <div className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 py-10">
-
-        {/* Hero Section */}
-        <div
-          className={`text-center mb-10 transition-all duration-700 ${
-            mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
-          }`}
-          style={{ transitionProperty: "opacity, transform" }}
-        >
-          {/* Icon ring */}
-          <div className="flex justify-center mb-5">
-            <div className="relative w-20 h-20 flex items-center justify-center">
-              <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-500/30 to-indigo-600/30 blur-xl animate-pulse" />
-              <div
-                className="absolute inset-0 rounded-full border border-blue-500/30"
-                style={{ animation: "spin 8s linear infinite" }}
-              />
-              <div
-                className="absolute inset-2 rounded-full border border-indigo-400/20"
-                style={{ animation: "spin 5s linear infinite reverse" }}
-              />
-              <FontAwesomeIcon
-                icon={faUsers}
-                className="relative text-blue-400 text-3xl"
-              />
-            </div>
+          {/* Live badge */}
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-blue-100 shadow-sm text-xs font-semibold text-blue-600 w-fit mb-3">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+            Live Collaboration
           </div>
 
-          <h2 className="font-bebas text-4xl sm:text-5xl md:text-6xl text-gray-100 tracking-wider font-header mb-3 leading-none">
-            Real-Time{" "}
-            <span
-              className="text-transparent bg-clip-text"
-              style={{ backgroundImage: "linear-gradient(90deg, #60a5fa, #22d3ee)" }}
-            >
-              Collaboration
-            </span>
+          {/* Heading — Outfit font, clean mixed-case */}
+          <h2 className="font-heading font-extrabold text-4xl lg:text-5xl text-slate-800 lg:whitespace-nowrap leading-tight mb-2">
+            Collaborate in Real-Time
           </h2>
-          <p className="text-sm sm:text-base text-gray-400 flex items-center justify-center gap-2 max-w-md mx-auto">
-            Code, pair-program, and sync edits with your team instantly
-            <Tooltip title="Real-time synchronized editing powered by WebSockets. No account required.">
-              <FontAwesomeIcon
-                className="text-gray-500 hover:text-gray-300 cursor-pointer transition-colors"
-                width={15}
-                icon={faCircleQuestion}
-              />
+          <p className="font-heading text-sm text-slate-400 mb-5 flex items-center gap-1.5">
+            Every keystroke synced instantly — no setup required
+            <Tooltip title="Powered by WebSockets. No account needed.">
+              <FontAwesomeIcon icon={faCircleQuestion} className="text-slate-300 hover:text-slate-500 cursor-pointer transition-colors" width={13} />
             </Tooltip>
           </p>
 
-          {/* Feature chips */}
-          <div className="flex flex-wrap justify-center gap-2 mt-5">
-            {features.map((f) => (
-              <div
-                key={f.label}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-slate-800/70 border border-slate-700/60 text-gray-300 hover:border-slate-500 transition-colors"
-              >
-                <FontAwesomeIcon icon={f.icon} className={f.color} width={11} />
-                {f.label}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Cards Container */}
-        <div
-          className={`w-full max-w-2xl transition-all duration-700 ${
-            mounted ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
-          }`}
-          style={{ transitionProperty: "opacity, transform", transitionDelay: "150ms" }}
-        >
-          {/* Display Name Box */}
-          <div className="backdrop-blur-sm bg-slate-800/50 border border-slate-600/50 rounded-2xl p-5 mb-5 shadow-2xl hover:border-slate-500/60 transition-all duration-300">
-            <label className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+          {/* Display name */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 mb-3">
+            <label className="block text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2">
               Your Display Name
             </label>
-            <div className="flex flex-col sm:flex-row gap-3 items-center">
+            <div className="flex gap-2">
               <input
                 type="text"
                 value={displayName}
-                onChange={(e) => handleNameChange(e.target.value)}
-                placeholder="Enter your name"
-                className="w-full sm:flex-1 p-3 bg-slate-900/70 border border-slate-600/60 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 font-roboto text-sm transition-all duration-200"
+                onChange={e => handleNameChange(e.target.value)}
+                placeholder="Enter your name…"
+                className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-400/30 focus:border-blue-400 transition-colors"
               />
-              <button
-                type="button"
-                onClick={generateRandomName}
-                className="w-full sm:w-auto px-4 py-3 bg-slate-700/70 hover:bg-slate-600/80 border border-slate-600/50 hover:border-slate-500 text-gray-200 rounded-xl text-sm font-medium transition-all duration-200 flex items-center justify-center gap-2 group"
-              >
-                <FontAwesomeIcon
-                  icon={faRandom}
-                  width={13}
-                  className="transition-transform duration-300 group-hover:rotate-180"
-                />
-                <span>Random</span>
+              <button type="button" onClick={generateRandomName} title="Random nickname"
+                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-lg text-slate-500 hover:text-slate-700 transition-colors duration-150">
+                <FontAwesomeIcon icon={faRandom} width={13} />
               </button>
             </div>
           </div>
 
-          {/* Create / Join Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Create / Join grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
 
-            {/* ── Create Room Card ── */}
-            <div className="group backdrop-blur-sm bg-slate-800/50 border border-slate-600/50 rounded-2xl p-6 shadow-2xl flex flex-col justify-between hover:border-blue-500/40 transition-all duration-300 hover:-translate-y-0.5">
-              <div>
-                {/* Icon */}
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="relative w-11 h-11 flex items-center justify-center">
-                    <div className="absolute inset-0 rounded-xl bg-blue-600/20 group-hover:bg-blue-600/30 transition-colors duration-300" />
-                    <div className="absolute inset-0 rounded-xl border border-blue-500/30 group-hover:border-blue-500/50 transition-colors duration-300" />
-                    <FontAwesomeIcon icon={faPlus} className="relative text-blue-400 text-base" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-100">Create a Room</h3>
-                    <p className="text-[11px] text-gray-500">Host a new session</p>
-                  </div>
+            {/* Create */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 hover:border-blue-300 hover:shadow-md transition-all duration-200 flex flex-col">
+              <div className="flex items-center gap-2.5 mb-2">
+                <span className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">
+                  <FontAwesomeIcon icon={faPlus} className="text-blue-500 text-xs" />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">Create a Room</p>
+                  <p className="text-[11px] text-slate-400">Host a new session</p>
                 </div>
-
-                <p className="text-gray-400 text-sm mb-6 leading-relaxed">
-                  Start a new live collaborative session and invite others by sharing your unique Room ID.
-                </p>
               </div>
-
-              <button
-                onClick={handleCreateRoom}
-                disabled={isCreating}
-                className="w-full relative overflow-hidden text-white font-semibold px-4 py-3 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer group/btn disabled:opacity-60 disabled:cursor-not-allowed"
-                style={{
-                  background: "linear-gradient(135deg, #2563eb, #1d4ed8)",
-                  boxShadow: "0 4px 20px rgba(37,99,235,0.35)",
-                }}
-              >
-                {/* Shine sweep */}
-                <span
-                  className="absolute inset-0 pointer-events-none"
-                  style={{
-                    background: "linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.12) 50%, transparent 70%)",
-                    transform: "translateX(-100%) skewX(-12deg)",
-                    transition: "transform 0.7s",
-                  }}
-                  ref={(el) => {
-                    if (!el) return;
-                    const parent = el.parentElement;
-                    const enter = () => { el.style.transform = "translateX(200%) skewX(-12deg)"; };
-                    const leave = () => { el.style.transform = "translateX(-100%) skewX(-12deg)"; };
-                    parent?.addEventListener("mouseenter", enter);
-                    parent?.addEventListener("mouseleave", leave);
-                  }}
-                />
-                <FontAwesomeIcon icon={faPlus} width={14} />
-                <span>{isCreating ? "Creating Room…" : "Create Room"}</span>
+              <p className="text-[11px] text-slate-400 leading-relaxed mb-3 px-0.5">
+                Start a fresh session and get a unique Room ID to share with teammates.
+              </p>
+              <button onClick={handleCreateRoom} disabled={isCreating}
+                className="mt-auto w-full py-2 bg-[#3b82f5] hover:bg-[#2563eb] disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-semibold rounded-lg transition-colors duration-150 flex items-center justify-center gap-2 shadow-sm">
+                <FontAwesomeIcon icon={faPlus} width={12} />
+                {isCreating ? "Creating…" : "Create Room"}
               </button>
             </div>
 
-            {/* ── Join Room Card ── */}
-            <div className="group backdrop-blur-sm bg-slate-800/50 border border-slate-600/50 rounded-2xl p-6 shadow-2xl flex flex-col justify-between hover:border-emerald-500/40 transition-all duration-300 hover:-translate-y-0.5">
-              <div>
-                {/* Icon */}
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="relative w-11 h-11 flex items-center justify-center">
-                    <div className="absolute inset-0 rounded-xl bg-emerald-600/20 group-hover:bg-emerald-600/30 transition-colors duration-300" />
-                    <div className="absolute inset-0 rounded-xl border border-emerald-500/30 group-hover:border-emerald-500/50 transition-colors duration-300" />
-                    <FontAwesomeIcon icon={faSignInAlt} className="relative text-emerald-400 text-base" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-100">Join a Room</h3>
-                    <p className="text-[11px] text-gray-500">Enter an existing session</p>
-                  </div>
+            {/* Join */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 hover:border-emerald-300 hover:shadow-md transition-all duration-200">
+              <div className="flex items-center gap-2.5 mb-3">
+                <span className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center shrink-0">
+                  <FontAwesomeIcon icon={faSignInAlt} className="text-emerald-500 text-xs" />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">Join a Room</p>
+                  <p className="text-[11px] text-slate-400">Enter an existing session</p>
                 </div>
-
-                <p className="text-gray-400 text-sm mb-4 leading-relaxed">
-                  Enter a Room ID or paste a share link to jump into your team&apos;s live session.
-                </p>
               </div>
-
-              <form onSubmit={handleJoinRoom} className="space-y-3">
-                <input
-                  type="text"
-                  value={roomId}
-                  onChange={(e) => setRoomId(e.target.value)}
+              <form onSubmit={handleJoinRoom} className="space-y-2">
+                <input type="text" value={roomId} onChange={e => setRoomId(e.target.value)}
                   placeholder="Room ID or share link…"
-                  className="w-full p-3 bg-slate-900/70 border border-slate-600/60 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 font-roboto text-sm transition-all duration-200"
-                />
-                <button
-                  type="submit"
-                  className="w-full relative overflow-hidden text-white font-semibold px-4 py-3 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer"
-                  style={{
-                    background: "linear-gradient(135deg, #059669, #047857)",
-                    boxShadow: "0 4px 20px rgba(5,150,105,0.30)",
-                  }}
-                >
-                  <span
-                    className="absolute inset-0 pointer-events-none"
-                    style={{
-                      background: "linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.12) 50%, transparent 70%)",
-                      transform: "translateX(-100%) skewX(-12deg)",
-                      transition: "transform 0.7s",
-                    }}
-                    ref={(el) => {
-                      if (!el) return;
-                      const parent = el.parentElement;
-                      const enter = () => { el.style.transform = "translateX(200%) skewX(-12deg)"; };
-                      const leave = () => { el.style.transform = "translateX(-100%) skewX(-12deg)"; };
-                      parent?.addEventListener("mouseenter", enter);
-                      parent?.addEventListener("mouseleave", leave);
-                    }}
-                  />
-                  <FontAwesomeIcon icon={faUsers} width={16} />
-                  <span>Join Room</span>
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-400/30 focus:border-emerald-400 transition-colors" />
+                <button type="submit"
+                  className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-semibold rounded-lg transition-colors duration-150 flex items-center justify-center gap-2 shadow-sm">
+                  <FontAwesomeIcon icon={faUsers} width={13} />
+                  Join Room
                 </button>
               </form>
             </div>
           </div>
 
-          {/* Bottom hint */}
-          <p className="text-center text-xs text-gray-600 mt-6">
-            Rooms are ephemeral — they exist only while participants are connected.
+          <p className="text-[11px] text-slate-400 mt-3">
+            No account needed · Rooms close when all participants leave
           </p>
         </div>
-      </div>
 
-      <style jsx>{`
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
+        {/* ─── Right: animated editor (desktop + mobile scroll) ─── */}
+        <div className="flex flex-1 items-center justify-center pb-8 lg:pb-0">
+          {/* Tilt wrapper */}
+          <div
+            ref={tiltRef}
+            onMouseMove={handleTiltMove}
+            onMouseLeave={handleTiltLeave}
+            style={{ willChange: "transform", borderRadius: "1rem" }}
+          >
+            <CollabEditor />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

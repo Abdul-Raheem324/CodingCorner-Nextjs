@@ -63,6 +63,7 @@ const config = {
       fontFamily: {
         sans: ["Roboto", "sans-serif"],
         bebas: ["Bebas Neue", "sans-serif"],
+        heading: ["Outfit", "sans-serif"],
         geist: ["Geist Sans", "sans-serif"],
         mono: ["Geist Mono", "monospace"],
       },

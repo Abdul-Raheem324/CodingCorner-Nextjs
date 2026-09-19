@@ -71,20 +71,46 @@ function Sidebar({ sidebarOpen, toggleSidebar, client, id }: SidebarProps) {
         {/* Active Users Section */}
         {sidebarOpen && (
           <div className="flex-grow p-4 overflow-y-auto custom-scrollbar">
-            <h3 className="text-lg font-medium text-green-500 mb-4">
-              Active Users
-            </h3>
-            <ul className="space-y-2 ">
-              {client.map(({ socketId, username }) => (
-                <div key={socketId || ""}>
-                  <li className="flex items-center space-x-4 p-4 bg-gray-800 rounded-lg shadow-md">
-                    <div className="flex items-center justify-center h-12 w-12 rounded-full bg-red-500 text-white text-lg font-bold">
-                      <h1>{username.slice(0, 2).toUpperCase()}</h1>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-gray-400 uppercase tracking-wider">
+                Active Users ({client.length})
+              </h3>
+            </div>
+            <ul className="space-y-2">
+              {client.map(({ socketId, username }) => {
+                const userColors = [
+                  "#3b82f6", "#10b981", "#f59e0b", "#ec4899",
+                  "#8b5cf6", "#06b6d4", "#f97316", "#14b8a6",
+                  "#a855f7", "#ef4444", "#84cc16"
+                ];
+                let hash = 0;
+                for (let i = 0; i < (username || "").length; i++) {
+                  hash = username.charCodeAt(i) + ((hash << 5) - hash);
+                }
+                const color = userColors[Math.abs(hash) % userColors.length];
+
+                return (
+                  <li
+                    key={socketId || username}
+                    className="flex items-center space-x-3 p-2.5 bg-gray-800/80 hover:bg-gray-800 border border-gray-700/50 rounded-lg shadow-sm transition"
+                  >
+                    <div
+                      className="relative flex items-center justify-center h-9 w-9 rounded-full text-white text-xs font-bold shadow-sm shrink-0"
+                      style={{ backgroundColor: color }}
+                    >
+                      {username ? username.slice(0, 2).toUpperCase() : "??"}
+                      <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-gray-800 rounded-full" />
                     </div>
-                    <p className="text-white text-lg font-medium">{username}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-sm font-medium truncate">{username}</p>
+                      <p className="text-xs text-gray-400 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: color }} />
+                        Active
+                      </p>
+                    </div>
                   </li>
-                </div>
-              ))}
+                );
+              })}
             </ul>
           </div>
         )}

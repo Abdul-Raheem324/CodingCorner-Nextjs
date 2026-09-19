@@ -8,7 +8,18 @@ type UserSocketMap = Record<string, string>;
 const port = Number(process.env.PORT) || 3001;
 const userSocketMap: UserSocketMap = {};
 
-const httpServer = createServer();
+const httpServer = createServer((req, res) => {
+  if (req.url === "/ping" || req.url === "/health" || req.url === "/") {
+    res.writeHead(200, {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    });
+    res.end(JSON.stringify({ status: "ok", message: "CodingCorner Server Awake", timestamp: Date.now() }));
+    return;
+  }
+  res.writeHead(404);
+  res.end();
+});
 
 const allowedOrigins = [
   "http://localhost:3000",
@@ -71,6 +82,13 @@ io.on("connection", (socket) => {
 
   socket.on("changeLanguage", ({ id, language }) => {
     socket.to(id).emit("changeLanguage", language);
+  });
+
+  socket.on("cursorMove", ({ id, cursor }) => {
+    socket.to(id).emit("cursorMove", {
+      ...cursor,
+      socketId: socket.id,
+    });
   });
 });
 

@@ -185,7 +185,7 @@ function MockEditor() {
                 {lineIdx + 1}
               </span>
 
-              <span className="flex flex-wrap items-center">
+              <span className="whitespace-pre">
                 {isVisible &&
                   line.tokens.map((tok, ti) => (
                     <span key={ti} style={{ color: tok.color }}>
