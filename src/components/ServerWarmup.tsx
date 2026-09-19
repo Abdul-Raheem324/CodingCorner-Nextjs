@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import axios from "axios";
+import axios, { InternalAxiosRequestConfig, AxiosResponse, AxiosError } from "axios";
 import toast from "react-hot-toast";
+
+interface CustomAxiosConfig extends InternalAxiosRequestConfig {
+  __requestId?: string;
+}
 
 export default function ServerWarmup() {
   const activeTimersRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
@@ -14,15 +18,18 @@ export default function ServerWarmup() {
       fetch(`${apiUrl}/ping`, { mode: "no-cors" }).catch(() => {});
     } catch {}
 
+    const timers = activeTimersRef.current;
+
     // 2. Global Axios request interceptor for delayed responses
-    const reqInterceptor = axios.interceptors.request.use((config) => {
-      const requestId = `${config.method || "get"}_${config.url}_${Date.now()}`;
-      (config as any).__requestId = requestId;
+    const reqInterceptor = axios.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+      const customConfig = config as CustomAxiosConfig;
+      const requestId = `${customConfig.method || "get"}_${customConfig.url}_${Date.now()}`;
+      customConfig.__requestId = requestId;
 
       // If request takes longer than 3 seconds, show friendly free tier cold-start notice
       const timer = setTimeout(() => {
         toast(
-          (t) => (
+          () => (
             <div className="flex items-start gap-3">
               <span className="text-xl">☕</span>
               <div>
@@ -49,25 +56,27 @@ export default function ServerWarmup() {
         );
       }, 3000);
 
-      activeTimersRef.current.set(requestId, timer);
-      return config;
+      timers.set(requestId, timer);
+      return customConfig;
     });
 
     const resInterceptor = axios.interceptors.response.use(
-      (response) => {
-        const requestId = (response.config as any)?.__requestId;
-        if (requestId && activeTimersRef.current.has(requestId)) {
-          clearTimeout(activeTimersRef.current.get(requestId));
-          activeTimersRef.current.delete(requestId);
+      (response: AxiosResponse) => {
+        const customConfig = response.config as CustomAxiosConfig;
+        const requestId = customConfig?.__requestId;
+        if (requestId && timers.has(requestId)) {
+          clearTimeout(timers.get(requestId));
+          timers.delete(requestId);
           toast.dismiss(`cold-start-${requestId}`);
         }
         return response;
       },
-      (error) => {
-        const requestId = (error.config as any)?.__requestId;
-        if (requestId && activeTimersRef.current.has(requestId)) {
-          clearTimeout(activeTimersRef.current.get(requestId));
-          activeTimersRef.current.delete(requestId);
+      (error: AxiosError) => {
+        const customConfig = error.config as CustomAxiosConfig | undefined;
+        const requestId = customConfig?.__requestId;
+        if (requestId && timers.has(requestId)) {
+          clearTimeout(timers.get(requestId));
+          timers.delete(requestId);
           toast.dismiss(`cold-start-${requestId}`);
         }
         return Promise.reject(error);
@@ -77,8 +86,8 @@ export default function ServerWarmup() {
     return () => {
       axios.interceptors.request.eject(reqInterceptor);
       axios.interceptors.response.eject(resInterceptor);
-      activeTimersRef.current.forEach((t) => clearTimeout(t));
-      activeTimersRef.current.clear();
+      timers.forEach((t) => clearTimeout(t));
+      timers.clear();
     };
   }, []);
 

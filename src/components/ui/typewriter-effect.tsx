@@ -101,7 +101,6 @@ export const TypewriterEffect = ({
 export const TypewriterEffectSmooth = ({
   words,
   className,
-  cursorClassName,
 }: {
   words: {
     text: string;

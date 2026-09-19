@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Editor, { Monaco } from "@monaco-editor/react";
 import { usePlaygroundState } from "@/context/playgroundProvider";
 import toast from "react-hot-toast";
@@ -303,7 +303,7 @@ const CollaborativePage: React.FC = () => {
     setShowNameModal(false);
   };
 
-  const broadcastMyCursor = (explicitPosition?: { lineNumber: number; column: number }) => {
+  const broadcastMyCursor = useCallback((explicitPosition?: { lineNumber: number; column: number }) => {
     const editor = editorRef.current;
     const socket = socketRef.current;
     const uname = currentUsernameRef.current;
@@ -328,7 +328,7 @@ const CollaborativePage: React.FC = () => {
         });
       }
     }
-  };
+  }, [id]);
 
   useEffect(() => {
     if (!mounted || !currentUsername || !id) return;
@@ -499,6 +499,10 @@ const CollaborativePage: React.FC = () => {
       setLanguage(newLanguage);
     });
 
+    const cursors = remoteCursorsRef.current;
+    const selections = remoteSelectionsRef.current;
+    const pendingDisconnects = pendingDisconnectsRef.current;
+
     return () => {
       socket.disconnect();
       socket.off("joined");
@@ -508,14 +512,14 @@ const CollaborativePage: React.FC = () => {
       socket.off("syncCode");
       socket.off("cursorMove");
 
-      remoteCursorsRef.current.forEach((c) => c.destroy());
-      remoteCursorsRef.current.clear();
-      remoteSelectionsRef.current.clear();
+      cursors.forEach((c) => c.destroy());
+      cursors.clear();
+      selections.clear();
 
-      pendingDisconnectsRef.current.forEach((t) => clearTimeout(t));
-      pendingDisconnectsRef.current.clear();
+      pendingDisconnects.forEach((t) => clearTimeout(t));
+      pendingDisconnects.clear();
     };
-  }, [currentUsername, id, mounted]);
+  }, [currentUsername, id, mounted, broadcastMyCursor]);
 
   const handleEditorChange = (value: string | undefined) => {
     if (isRemoteChangeRef.current) return;
