@@ -21,16 +21,12 @@ const httpServer = createServer((req, res) => {
   res.end();
 });
 
-const allowedOrigins = [
-  "http://localhost:3000",
-  process.env.CLIENT_URL,
-  process.env.FRONTEND_URL,
-  process.env.NEXT_PUBLIC_APP_URL,
-].filter(Boolean) as string[];
-
 const io = new Server(httpServer, {
   cors: {
-    origin: allowedOrigins.length > 0 ? allowedOrigins : "*",
+    origin: (origin, callback) => {
+      // Allow all origins including Vercel preview/prod domains and localhost
+      callback(null, true);
+    },
     methods: ["GET", "POST"],
     credentials: true,
   },

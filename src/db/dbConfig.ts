@@ -17,8 +17,8 @@ async function connectDB():Promise<void> {
 
         console.log("MongoDb connected successfully!")
     } catch (error) {
-        console.log("Error creating database", error)
-        process.exit(1) 
+        console.error("Error connecting to MongoDB:", error);
+        throw error;
     }
 }
 
