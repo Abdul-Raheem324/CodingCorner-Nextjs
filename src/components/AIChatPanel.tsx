@@ -5,7 +5,6 @@ import {
   ArrowUp,
   X,
   Sparkles,
-  Code,
   Lightbulb,
   Bug,
   Copy,
@@ -224,7 +223,7 @@ export default function AIChatPanel({
   currentUser,
   getFullCode,
   getSelectedText,
-  getAuthorMap,
+  getAuthorMap: _getAuthorMap,
   onClose,
 }: AIChatPanelProps) {
   const [messages, setMessages] = useState<Message[]>([
