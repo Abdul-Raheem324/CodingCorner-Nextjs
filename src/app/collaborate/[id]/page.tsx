@@ -7,8 +7,10 @@ import toast from "react-hot-toast";
 import { getSocket } from "@/config/socket";
 import { useParams } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
+import AIChatPanel from "@/components/AIChatPanel";
 import type * as MonacoEditor from "monaco-editor";
 import type { Socket } from "socket.io-client";
+import { Sparkles } from "lucide-react";
 
 type Client = {
   username: string;
@@ -241,10 +243,16 @@ const CollaborativePage: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [client, setClient] = useState<Client[]>([]);
   const [language, setLanguage] = useState("javascript");
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
 
   const initialCode = "// Write or paste your code here to collaborate in real-time\n";
   const codeRef = useRef<string>(initialCode);
   const isRemoteChangeRef = useRef<boolean>(false);
+
+  // authorMap: line number (1-indexed) → username who last edited that line
+  const authorMapRef = useRef<Record<number, string>>({});
+  // Debounce timer for code indexing
+  const indexDebounceRef = useRef<NodeJS.Timeout | null>(null);
 
   const editorRef = useRef<MonacoEditor.editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<Monaco | null>(null);
@@ -415,11 +423,21 @@ const CollaborativePage: React.FC = () => {
 
       setClient((prev) => prev.filter((c) => c.socketId !== socketId));
 
-      // Debounce leave toast (2.5s) to avoid toast spam on reload
-      if (username) {
+      // Debounce leave toast (2.5s) to avoid toast spam on reload — ignore oneself
+      if (username && username !== currentUsernameRef.current) {
+        if (pendingDisconnectsRef.current.has(username)) {
+          clearTimeout(pendingDisconnectsRef.current.get(username));
+        }
         const timer = setTimeout(() => {
-          knownUsernamesRef.current.delete(username);
-          toast.error(`${username} left!`, { id: `toast-left-${username}` });
+          // Verify user is actually no longer in the active clients list
+          setClient((latestClients) => {
+            const isStillPresent = latestClients.some((c) => c.username === username);
+            if (!isStillPresent && username !== currentUsernameRef.current) {
+              knownUsernamesRef.current.delete(username);
+              toast.error(`${username} left!`, { id: `toast-left-${username}` });
+            }
+            return latestClients;
+          });
           pendingDisconnectsRef.current.delete(username);
         }, 2500);
         pendingDisconnectsRef.current.set(username, timer);
@@ -521,11 +539,73 @@ const CollaborativePage: React.FC = () => {
     };
   }, [currentUsername, id, mounted, broadcastMyCursor]);
 
+  // ── Track who typed which lines ─────────────────────────────────────────
+  const updateAuthorMap = useCallback(
+    (oldCode: string, newCode: string, username: string) => {
+      const oldLines = oldCode.split("\n");
+      const newLines = newCode.split("\n");
+      const newMap: Record<number, string> = { ...authorMapRef.current };
+
+      // Find first differing line
+      let firstDiff = 0;
+      while (
+        firstDiff < oldLines.length &&
+        firstDiff < newLines.length &&
+        oldLines[firstDiff] === newLines[firstDiff]
+      ) firstDiff++;
+
+      // Find last differing line from the end
+      let lastDiffOld = oldLines.length - 1;
+      let lastDiffNew = newLines.length - 1;
+      while (
+        lastDiffOld > firstDiff &&
+        lastDiffNew > firstDiff &&
+        oldLines[lastDiffOld] === newLines[lastDiffNew]
+      ) { lastDiffOld--; lastDiffNew--; }
+
+      // Attribute changed lines to the current user
+      for (let i = firstDiff; i <= lastDiffNew; i++) {
+        newMap[i + 1] = username;
+      }
+      authorMapRef.current = newMap;
+    },
+    []
+  );
+
+  // ── Debounced code indexing into MongoDB ─────────────────────────────────
+  const scheduleIndexCode = useCallback(
+    (code: string, lang: string) => {
+      if (indexDebounceRef.current) clearTimeout(indexDebounceRef.current);
+      indexDebounceRef.current = setTimeout(async () => {
+        try {
+          await fetch("/api/ai/index-code", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              roomId: id,
+              code,
+              language: lang,
+              authorMap: authorMapRef.current,
+            }),
+          });
+        } catch (e) {
+          console.warn("[AI] Code indexing failed:", e);
+        }
+      }, 4000); // index 4s after typing stops
+    },
+    [id]
+  );
+
   const handleEditorChange = (value: string | undefined) => {
     if (isRemoteChangeRef.current) return;
     if (value !== undefined && socketRef.current) {
+      const oldCode = codeRef.current;
       codeRef.current = value;
       socketRef.current.emit("codeChange", { id, code: value });
+      // Track authorship for locally typed changes
+      updateAuthorMap(oldCode, value, currentUsernameRef.current);
+      // Schedule background indexing
+      scheduleIndexCode(value, language);
     }
   };
 
@@ -535,8 +615,42 @@ const CollaborativePage: React.FC = () => {
     socketRef.current?.emit("changeLanguage", { id, language: newLanguage });
   };
 
+  // ── AI Panel helpers ─────────────────────────────────────────────────────
+  const getFullCode = useCallback(() => codeRef.current, []);
+
+  const getSelectedText = useCallback(() => {
+    const editor = editorRef.current;
+    if (!editor) return "";
+    const sel = editor.getSelection();
+    if (!sel) return "";
+    const model = editor.getModel();
+    if (!model) return "";
+    return model.getValueInRange(sel);
+  }, []);
+
+  const getAuthorMap = useCallback(() => {
+    const currentCode = codeRef.current || "";
+    const lines = currentCode.split("\n");
+    const map: Record<number, string> = { ...authorMapRef.current };
+
+    if (currentUsernameRef.current) {
+      lines.forEach((line, idx) => {
+        const lineNum = idx + 1;
+        if (!map[lineNum] && line.trim().length > 0 && !line.startsWith("// Write or paste your code")) {
+          map[lineNum] = currentUsernameRef.current;
+        }
+      });
+    }
+    return map;
+  }, []);
+
+  const memberNames = [
+    ...new Set([...client.map((c) => c.username), currentUsername].filter(Boolean)),
+  ];
+
   return (
     <div className="flex h-screen overflow-hidden bg-slate-900 text-white relative">
+
       {/* Name Prompt Modal for Guests */}
       {mounted && showNameModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
@@ -587,8 +701,11 @@ const CollaborativePage: React.FC = () => {
 
       {/* Main Collaboration Screen */}
       <Sidebar sidebarOpen={sidebarOpen} toggleSidebar={() => setSidebarOpen(!sidebarOpen)} client={client} id={id} />
-      <div className={`flex-grow flex flex-col ${sidebarOpen ? "ml-64" : "ml-16"} transition-all duration-300 ease-in-out`}>
-        <div className="flex items-center justify-between px-6 py-3 bg-gray-900 border-b border-gray-800">
+
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+        {/* Full-width Top Header */}
+        <div className="flex items-center justify-between px-6 py-3 bg-gray-900 border-b border-gray-800 shrink-0 z-10">
           <div className="flex items-center gap-4">
             <span className="text-sm font-medium text-gray-400">Language:</span>
             <select
@@ -603,23 +720,39 @@ const CollaborativePage: React.FC = () => {
               <option value="c">C</option>
             </select>
           </div>
-          {mounted && currentUsername && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-400">Coding as:</span>
-              <span
-                className="text-xs font-bold text-white px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1.5"
-                style={{ backgroundColor: getUserColor(currentUsername) }}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                {currentUsername}
-              </span>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            {mounted && currentUsername && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400">Coding as:</span>
+                <span
+                  className="text-xs font-bold text-white px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1.5"
+                  style={{ backgroundColor: getUserColor(currentUsername) }}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                  {currentUsername}
+                </span>
+              </div>
+            )}
+            {/* AI Toggle */}
+            <button
+              onClick={() => setAiPanelOpen((prev) => !prev)}
+              title="Toggle Room AI Assistant"
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 border ${
+                aiPanelOpen
+                  ? "bg-blue-600/15 text-blue-400 border-blue-500/30 shadow-sm shadow-blue-500/10"
+                  : "bg-gray-800 text-gray-300 hover:text-white hover:bg-gray-750 border-gray-700"
+              }`}
+            >
+              <Sparkles className={`w-3.5 h-3.5 ${aiPanelOpen ? "text-blue-400" : "text-gray-400"}`} />
+              <span>Room AI</span>
+              {aiPanelOpen && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/50" />}
+            </button>
+          </div>
         </div>
 
         {/* Cold Start Notice Banner */}
         {isWakingUp && (
-          <div className="bg-amber-500/10 border-b border-amber-500/30 px-6 py-2 flex items-center justify-between text-xs text-amber-300 animate-in fade-in duration-300">
+          <div className="bg-amber-500/10 border-b border-amber-500/30 px-6 py-2 flex items-center justify-between text-xs text-amber-300 animate-in fade-in duration-300 shrink-0">
             <div className="flex items-center gap-2.5">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
@@ -633,49 +766,68 @@ const CollaborativePage: React.FC = () => {
           </div>
         )}
 
-        <div className="flex-grow h-full w-full">
-          <Editor
-            defaultValue={initialCode}
-            options={{
-              minimap: { enabled: false },
-              automaticLayout: true,
-              fontSize: 16,
-              padding: { top: 12 },
-              wordWrap: "on",
-            }}
-            theme="my-dark-theme"
-            className="w-full h-full"
-            onMount={(editor, monaco) => {
-              editorRef.current = editor;
-              monacoRef.current = monaco;
+        {/* Workspace: Monaco Editor on left + AI Panel docked on right */}
+        <div className="flex-1 flex min-h-0 relative overflow-hidden bg-slate-900">
+          <div className="flex-1 min-w-0 h-full relative">
+            <Editor
+              defaultValue={initialCode}
+              options={{
+                minimap: { enabled: false },
+                automaticLayout: true,
+                fontSize: 16,
+                padding: { top: 12 },
+                wordWrap: "on",
+              }}
+              theme="my-dark-theme"
+              className="w-full h-full"
+              onMount={(editor, monaco) => {
+                editorRef.current = editor;
+                monacoRef.current = monaco;
 
-              editor.onDidChangeCursorPosition((e) => {
-                if (!isRemoteChangeRef.current) {
-                  broadcastMyCursor(e.position);
-                }
-              });
+                editor.onDidChangeCursorPosition((e) => {
+                  if (!isRemoteChangeRef.current) {
+                    broadcastMyCursor(e.position);
+                  }
+                });
 
-              editor.onDidChangeCursorSelection(() => {
-                if (!isRemoteChangeRef.current) {
-                  broadcastMyCursor();
-                }
-              });
+                editor.onDidChangeCursorSelection(() => {
+                  if (!isRemoteChangeRef.current) {
+                    broadcastMyCursor();
+                  }
+                });
 
-              broadcastMyCursor();
-            }}
-            beforeMount={(monaco: Monaco) => {
-              monaco.editor.defineTheme("my-dark-theme", {
-                base: "vs-dark",
-                inherit: true,
-                rules: [],
-                colors: {
-                  "editor.background": "#0f172a",
-                },
-              });
-            }}
-            onChange={handleEditorChange}
-            language={language || "javascript"}
-          />
+                broadcastMyCursor();
+              }}
+              beforeMount={(monaco: Monaco) => {
+                monaco.editor.defineTheme("my-dark-theme", {
+                  base: "vs-dark",
+                  inherit: true,
+                  rules: [],
+                  colors: {
+                    "editor.background": "#0f172a",
+                  },
+                });
+              }}
+              onChange={handleEditorChange}
+              language={language || "javascript"}
+            />
+          </div>
+
+          {/* AI Chat Panel — docked beside the editor */}
+          {aiPanelOpen && mounted && currentUsername && (
+            <div className="w-[380px] shrink-0 h-full p-3 pl-1 flex flex-col z-20 animate-in slide-in-from-right-4 duration-200">
+              <AIChatPanel
+                roomId={id}
+                language={language}
+                members={memberNames}
+                currentUser={currentUsername}
+                getFullCode={getFullCode}
+                getSelectedText={getSelectedText}
+                getAuthorMap={getAuthorMap}
+                onClose={() => setAiPanelOpen(false)}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>
